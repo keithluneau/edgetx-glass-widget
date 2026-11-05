@@ -4,6 +4,9 @@
 
 ## Overview
 
+[![Watch it in action!](images/video_thumbnail.jpg)](https://www.youtube.com/watch?v=KfEa5BUTyTc)
+
+
 Glass turns the color screen of your EdgeTX radio into a "glass cockpit" display for ArduPilot. It shows an artificial horizon with a pitch ladder and bank scale, speed and altitude tapes with a vertical-speed bar, a heading tape, battery and link status, a home arrow with distance, a flight timer, and a flight summary after landing. It is inspired by the look of a real aircraft's primary flight display.
 
 It reads ArduPilot's "passthrough" telemetry carried over CRSF, plus the standard CRSF telemetry sensors, so it works with ExpressLRS and Crossfire links.
