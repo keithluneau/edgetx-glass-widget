@@ -140,7 +140,7 @@ There are seven options. Every warning is **off by default** (set to 0), so the 
 | **WarnRSSI** | number 0 to 130 | 0 | Signal-strength warning. Enter a positive number: `95` means -95 dBm. 0 turns it off. |
 | **WarnMAh** | number 0 to 30000 | 0 | Warns when the mAh used reaches or passes this value. 0 turns it off. |
 
-![Widget settings](images/widget-settings.png)
+![Widget settings](images/widget-settings2.png)
 
 ### How the warnings behave
 
