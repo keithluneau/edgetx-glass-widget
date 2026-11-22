@@ -30,11 +30,16 @@
   vertical speed, speed and heading are lightly smoothed (fixed).
   Don't keep the Yaapu widget active in the same model while using this one:
   both read the same frame queue.
+
+  Options: this widget has 7 options, so it needs EdgeTX 2.11 or newer (older
+  versions allow at most 5 options per widget).
 ]]
 
 local options = {
   { "Imperial", BOOL, 0 },        -- 1 = mph / ft / ft per s
-  { "WarnVolts", STRING, "0" },     -- low-voltage warning, total pack volts, e.g. 12.2 (0 = off)
+  { "WarnVolts", STRING, "0" },     -- low-voltage warning in volts: whole pack, or per cell if PerCell is on (0 = off)
+  { "PerCell",  BOOL, 0 },          -- 1 = WarnVolts is a per-cell voltage (e.g. 3.5) instead of the pack voltage
+  { "Cells",    VALUE, 0, 0, 12 },  -- cell count for PerCell (0 = detect it from the pack voltage)
   { "WarnLQ",   VALUE, 0, 0, 100 },  -- link-quality warning at or below this % (0 = off)
   { "WarnRSSI", VALUE, 0, 0, 130 },  -- RSSI warning: enter 95 to warn at -95 dBm or weaker (0 = off)
   { "WarnMAh",  VALUE, 0, 0, 30000 }  -- mAh warning: flashes at or above this many mAh used (0 = off)
@@ -473,6 +478,18 @@ local function poll(w)
   d.spd = w.spdS
 
   d.volt = tv("RxBt")
+
+  -- Cell count for the per-cell warning: fixed by the Cells option, otherwise worked out
+  -- from the pack voltage (no LiPo/LiHV cell is above 4.35 V). It is only re-detected on
+  -- the ground (or if it is not known yet), so voltage sag in flight cannot change it.
+  if w.cells > 0 then
+    d.cells = w.cells
+  elseif d.volt > 0 and (not w.flying or not d.cells) then
+    d.cells = ceil(d.volt / 4.35)
+  end
+  d.cells = d.cells or 1
+  d.warnVolt = w.perCell and (d.volt / d.cells) or d.volt     -- the value WarnVolts is compared with
+  d.perCell = w.perCell                                       -- the big voltage readout shows it too
   d.curr = tv("Curr")
   d.capa = tv("Capa")
   d.lq   = tv("RQly")
@@ -920,10 +937,11 @@ local function drawBottom(d, imperial, warnV, warnMah)
   -- green above the warning voltage, flashing red/yellow at or below it.
   -- Hysteresis: once the warning has tripped it only clears when the voltage
   -- recovers 2% above the setting, so load sag around the threshold can't make it chatter.
+  local wv = d.warnVolt or d.volt
   if warnV > 0 and d.volt > 0 then
-    if d.volt <= warnV then
+    if wv <= warnV then
       d.lowBat = true
-    elseif d.volt > warnV * 1.02 then
+    elseif wv > warnV * 1.02 then
       d.lowBat = false
     end
   else
@@ -933,7 +951,9 @@ local function drawBottom(d, imperial, warnV, warnMah)
   if d.lowBat then
     bc = ((getTime() % 100) < 50) and C.red or C.yellow
   end
-  text(5, y0 + 2, fmt("%.1fV", d.volt), bc, L.voltFont)
+  -- whole-pack voltage, or the per-cell voltage (two decimals) when PerCell is on
+  local vtxt = d.perCell and fmt("%.2fV", d.warnVolt) or fmt("%.1fV", d.volt)
+  text(5, y0 + 2, vtxt, bc, L.voltFont)
   text(5, y0 + 2 + L.voltH + 2, fmt("%.1fA", d.curr), C.white, L.batFont)
   local mc = C.green
   if warnMah > 0 and d.capa >= warnMah then
@@ -1010,7 +1030,8 @@ local function create(zone, opts)
   return { zone = zone, options = opts, d = {}, home = nil,
            hLat = {}, hLon = {}, hTime = {},
            warnV = parseWarn(opts), warnLq = opts.WarnLQ or 0, warnRssi = opts.WarnRSSI or 0,
-           warnMah = opts.WarnMAh or 0 }
+           warnMah = opts.WarnMAh or 0,
+           perCell = (opts.PerCell or 0) ~= 0, cells = opts.Cells or 0 }
 end
 
 local function update(w, opts)
@@ -1018,6 +1039,7 @@ local function update(w, opts)
   w.warnV = parseWarn(opts)
   w.warnLq, w.warnRssi = opts.WarnLQ or 0, opts.WarnRSSI or 0
   w.warnMah = opts.WarnMAh or 0
+  w.perCell, w.cells = (opts.PerCell or 0) ~= 0, opts.Cells or 0
   computeLayout()
 end
 

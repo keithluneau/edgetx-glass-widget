@@ -19,7 +19,7 @@ It reads ArduPilot's "passthrough" telemetry carried over CRSF, plus the standar
 
 ## What you need
 
-- An EdgeTX radio with a color screen. EdgeTX 2.9 or newer is recommended (older versions cannot provide the flight-mode text this widget needs).
+- An EdgeTX radio with a color screen. EdgeTX 2.11 or newer is required. The widget has seven options, and EdgeTX versions before 2.11 allow at most five options per widget.
 - An ExpressLRS or Crossfire link that passes CRSF telemetry to the radio.
 - An ArduPilot flight controller (Plane recommended), version 4.2 or newer, with the receiver connected to a serial port.
 - A GPS with a good lock for the best results.
@@ -73,7 +73,7 @@ ArduPilot sets its own home position when you arm, using GPS. Glass mirrors this
 
 ## Part 2: ExpressLRS settings
 
-Use a recent ExpressLRS (tested with 3.x, theoretically 4.x should work the same) on both the transmitter and the receiver. In the radio's ExpressLRS Lua script, set:
+Use a recent ExpressLRS (tested with 3.x and 4.1.0), with the same major version on the transmitter and the receiver. In the radio's ExpressLRS Lua script, set:
 
 - **Packet rate:** 100 Hz Full or faster. The "Full" modes have more room for telemetry than the non-Full modes.
 - **Telemetry ratio:** 1:2 was used for all development and testing.
@@ -128,12 +128,14 @@ In the same screen setup, select the Glass widget and open its settings. This is
 
 ## Part 4: Widget options
 
-There are five options. Every warning is **off by default** (set to 0), so the widget works as a plain display until you choose thresholds.
+There are seven options. Every warning is **off by default** (set to 0), so the widget works as a plain display until you choose thresholds.
 
 | Option | Type | Default | What it does |
 | --- | --- | --- | --- |
 | **Imperial** | on/off | off | Off shows metric (km/h, meters, m/s, km). On shows mph, feet, ft/s and miles. |
-| **WarnVolts** | text | 0 | Low-voltage warning for the whole pack, in volts. Type the value as you would write it, e.g. `14.0`. `12,2` and `12.2V` also work. 0 turns it off. |
+| **WarnVolts** | text | 0 | Low-voltage warning, in volts. By default it is for the whole pack; with **PerCell** on it is per cell. Type the value as you would write it, e.g. `14.0` (pack) or `3.5` (per cell). `12,2` and `12.2V` also work. 0 turns it off. |
+| **PerCell** | on/off | off | Off: **WarnVolts** is the whole-pack voltage. On: **WarnVolts** is the voltage per cell. |
+| **Cells** | number 0 to 12 | 0 | Number of cells in the pack. Only used when **PerCell** is on. 0 detects it automatically from the pack voltage; set it by hand if the detection is wrong (see below). |
 | **WarnLQ** | number 0 to 100 | 0 | Link-quality warning, in percent. 0 turns it off. |
 | **WarnRSSI** | number 0 to 130 | 0 | Signal-strength warning. Enter a positive number: `95` means -95 dBm. 0 turns it off. |
 | **WarnMAh** | number 0 to 30000 | 0 | Warns when the mAh used reaches or passes this value. 0 turns it off. |
@@ -145,6 +147,7 @@ There are five options. Every warning is **off by default** (set to 0), so the w
 When a warning is active, the value flashes red and yellow about once per second. When it is not active, the value is green.
 
 - **WarnVolts:** warns at or below the voltage you set. Once it has tripped, it only clears when the voltage recovers to 2 percent above your setting, so load sag near the threshold does not make it flicker.
+- **Per-cell mode (PerCell on):** the pack voltage is divided by the number of cells, and that figure is compared with **WarnVolts**. With **Cells** at 0, the widget works out the cell count from the pack voltage, because no LiPo or LiHV cell is above 4.35 V (for example, 14.8 V is 4 cells). It detects the count only while on the ground, so voltage sag in flight cannot change it. If you connect a very discharged pack (below about 3.3 V per cell), the count can come out one too low, so set **Cells** yourself in that case. The large voltage reading on the display also switches to the voltage per cell (two decimals) while **PerCell** is on.
 - **WarnLQ:** warns at or below the percentage. Clears when LQ is 3 points above it.
 - **WarnRSSI:** warns when the signal is as weak as, or weaker than, your value. Clears when it is 3 dB stronger.
 - **WarnMAh:** warns at or above the value. The mAh counter is the total since the battery was connected, which is what ArduPilot reports, not just the current flight.
@@ -156,7 +159,7 @@ The satellite count has fixed colors: green at 8 or more, yellow at 6 or 7, red 
 
 These are only starting points. Adjust them after you have seen what your normal flights look like.
 
-**Battery voltage (LiPo).** Many pilots use about 3.5 V per cell under load as a first warning. Use a slightly higher number if your pack sags a lot.
+**Battery voltage (LiPo).** Many pilots use about 3.5 V per cell under load as a first warning. Use a slightly higher number if your pack sags a lot. With **PerCell** on, just type `3.5` whatever the pack size. With **PerCell** off, type the whole-pack voltage from this table:
 
 | Cells | 3.5 V per cell | 3.6 V per cell |
 | --- | --- | --- |
@@ -208,7 +211,7 @@ A magenta **H** on the tape marks the direction of home when it is within 45 deg
 
 ### Battery (bottom left)
 
-Pack voltage (large), current in amps, and mAh used. The voltage and mAh turn into flashing warnings if you set `WarnVolts` or `WarnMAh`.
+Pack voltage (large), current in amps, and mAh used. The voltage and mAh turn into flashing warnings if you set `WarnVolts` or `WarnMAh`. The large number is the whole-pack voltage, or the voltage per cell (two decimals) when `PerCell` is on.
 
 ### Flight timer (bottom center)
 
@@ -248,10 +251,11 @@ A red box appears over the horizon when link quality, RSSI and battery voltage a
 | Everything is zero or "NO TELEMETRY". | The link is down or the sensors were not discovered. Check that RSSI and LQ show on the radio and run **Discover new sensors** again. |
 | The horizon does not move, or moves about once a second. | Passthrough is not arriving. The widget falls back to the slow standard attitude data, which updates about once a second. Check `SERIALx_PROTOCOL` = 23, `RC_OPTIONS` bit 8 (value 256). |
 | It always shows ARMED. | `RC_OPTIONS` bit 12 (value 4096, annotate flight mode on disarm) is not set. |
-| The flight mode shows as dashes. | EdgeTX is older than 2.9, the `FM` sensor has not been discovered, or ArduPilot is not sending flight mode. |
+| The flight mode shows as dashes. | The `FM` sensor has not been discovered, or ArduPilot is not sending flight mode. |
 | The home arrow shows "NO HOME". | There is no GPS fix yet. It needs 8 or more satellites for the first fix, or 6 or more when you arm. |
 | Speeds or altitudes look doubled or wrong. | The radio's own telemetry unit setting is on imperial. Set it to metric and use the widget's Imperial option instead. |
 | The voltage or mAh readings are wrong. | Check ArduPilot's battery monitor settings and calibration (Part 1.3). |
+| The per-cell voltage warning comes at the wrong time. | The widget may have counted the wrong number of cells, for example if a very discharged pack was connected. Set **Cells** to the number of cells in your pack. |
 | Updates look slow. | See the update-rate table in Part 2. Passthrough attitude is about 5 updates per second, and altitude and speed are slower. This is how often ArduPilot sends them. |
 | The screen redraws slowly. | On the 800x480 TX16S MK3 the widget redraws about 8 times a second; on a 480x320 GX15 about 18. This is a limit of the radio's drawing speed, not of the telemetry. |
 
@@ -260,7 +264,7 @@ A red box appears over the horizon when link quality, RSSI and battery voltage a
 - Glass reads CRSF telemetry only. FrSky S.Port and F.Port passthrough are not supported.
 - The heading is the GPS course, so it is held (not live) at very low speeds, and the compass is not suited to aircraft that hover.
 - Altitude is measured from home, so it reads relative to where you armed, not above sea level.
-- The widget has five options because EdgeTX versions before 2.11 allow at most five options per widget.
+- The widget has seven options, so it needs EdgeTX 2.11 or newer. Versions before 2.11 allow at most five options per widget.
 - Fonts and spacing adapt to the screen size automatically. There is no text-size setting.
 
 ## Disclaimer
